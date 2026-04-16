@@ -17,9 +17,9 @@ const exchangeName = "x.sse.fanout"
 
 // incomingMessage is the envelope published by service servers to the exchange.
 type incomingMessage struct {
-	UserID int64           `json:"user_id"`
-	Event  string          `json:"event"`
-	Data   json.RawMessage `json:"data"`
+	UserID  int64           `json:"user_id"`
+	SSEType string          `json:"sse_type"`
+	Data    json.RawMessage `json:"data"`
 }
 
 // StartConsumer connects to RabbitMQ, declares the temporary queue,
@@ -120,12 +120,12 @@ func dispatch(hub *sse.Hub, body []byte) {
 		log.Printf("Failed to unmarshal message: %v — body: %s", err, string(body))
 		return
 	}
-	if incoming.UserID == 0 || incoming.Event == "" {
-		log.Printf("Dropping message: missing user_id or event — body: %s", string(body))
+	if incoming.UserID == 0 || incoming.SSEType == "" {
+		log.Printf("Dropping message: missing user_id or sse_type — body: %s", string(body))
 		return
 	}
 	hub.Broadcast(incoming.UserID, sse.Event{
-		Type: incoming.Event,
+		Type: incoming.SSEType,
 		Data: incoming.Data,
 	})
 }

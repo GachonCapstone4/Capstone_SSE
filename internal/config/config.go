@@ -1,28 +1,49 @@
 package config
 
-import "os"
+import (
+	"fmt"
+	"os"
+	"strings"
+)
 
 type Config struct {
 	RabbitMQHost string
 	RabbitMQPort string
-	ServerPort   string
 	AdminID      string
 	AdminPW      string
+	ServerPort   string
 }
 
-func Load() *Config {
-	return &Config{
-		RabbitMQHost: getEnv("RABBITMQ_HOST", "192.168.2.20"),
-		RabbitMQPort: getEnv("RABBITMQ_PORT", "30672"),
-		ServerPort:   getEnv("SERVER_PORT", "8080"),
-		AdminID:      getEnv("ADMIN_ID", "admin"),
-		AdminPW:      getEnv("ADMIN_PW", "admin1234!"),
+func Load() (*Config, error) {
+	serverPort := os.Getenv("SERVER_PORT")
+	if serverPort == "" {
+		serverPort = "8080"
 	}
-}
 
-func getEnv(key, defaultVal string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
+	cfg := &Config{
+		RabbitMQHost: os.Getenv("RABBITMQ_HOST"),
+		RabbitMQPort: os.Getenv("RABBITMQ_PORT"),
+		AdminID:      os.Getenv("ADMIN_ID"),
+		AdminPW:      os.Getenv("ADMIN_PW"),
+		ServerPort:   serverPort,
 	}
-	return defaultVal
+
+	var missing []string
+	if cfg.RabbitMQHost == "" {
+		missing = append(missing, "RABBITMQ_HOST")
+	}
+	if cfg.RabbitMQPort == "" {
+		missing = append(missing, "RABBITMQ_PORT")
+	}
+	if cfg.AdminID == "" {
+		missing = append(missing, "ADMIN_ID")
+	}
+	if cfg.AdminPW == "" {
+		missing = append(missing, "ADMIN_PW")
+	}
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("missing required environment variables: %s", strings.Join(missing, ", "))
+	}
+
+	return cfg, nil
 }

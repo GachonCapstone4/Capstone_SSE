@@ -10,9 +10,12 @@ import (
 )
 
 func main() {
-	cfg := config.Load()
-	hub := sse.NewHub()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("config error: %v", err)
+	}
 
+	hub := sse.NewHub()
 	go rabbitmq.StartConsumer(hub, cfg)
 
 	http.HandleFunc("/sse/connect", sse.NewConnectHandler(hub))

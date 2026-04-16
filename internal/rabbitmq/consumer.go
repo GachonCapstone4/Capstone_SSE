@@ -17,7 +17,7 @@ const exchangeName = "x.sse.fanout"
 
 // incomingMessage is the envelope published by service servers to the exchange.
 type incomingMessage struct {
-	UserID string          `json:"user_id"`
+	UserID int64           `json:"user_id"`
 	Event  string          `json:"event"`
 	Data   json.RawMessage `json:"data"`
 }
@@ -120,7 +120,7 @@ func dispatch(hub *sse.Hub, body []byte) {
 		log.Printf("Failed to unmarshal message: %v — body: %s", err, string(body))
 		return
 	}
-	if incoming.UserID == "" || incoming.Event == "" {
+	if incoming.UserID == 0 || incoming.Event == "" {
 		log.Printf("Dropping message: missing user_id or event — body: %s", string(body))
 		return
 	}

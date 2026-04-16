@@ -15,24 +15,24 @@ type Event struct {
 // One user may have multiple open connections (e.g. multiple browser tabs).
 type Hub struct {
 	mu      sync.RWMutex
-	clients map[string][]chan Event
+	clients map[int64][]chan Event
 }
 
 func NewHub() *Hub {
 	return &Hub{
-		clients: make(map[string][]chan Event),
+		clients: make(map[int64][]chan Event),
 	}
 }
 
 // Register adds a channel for the given user.
-func (h *Hub) Register(userID string, ch chan Event) {
+func (h *Hub) Register(userID int64, ch chan Event) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.clients[userID] = append(h.clients[userID], ch)
 }
 
 // Unregister removes a specific channel for the given user.
-func (h *Hub) Unregister(userID string, ch chan Event) {
+func (h *Hub) Unregister(userID int64, ch chan Event) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	channels := h.clients[userID]
@@ -48,7 +48,7 @@ func (h *Hub) Unregister(userID string, ch chan Event) {
 }
 
 // Broadcast sends an event to all connections owned by the given user.
-func (h *Hub) Broadcast(userID string, event Event) {
+func (h *Hub) Broadcast(userID int64, event Event) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	for _, ch := range h.clients[userID] {

@@ -54,14 +54,14 @@ func NewConnectHandler(hub *Hub) http.HandlerFunc {
 
 // extractUserID parses the Authorization: Bearer <JWT> header and returns the subject claim as user_id.
 // Signature verification is skipped because this gateway runs inside the cluster (internal network).
-func extractUserID(r *http.Request) (string, error) {
+func extractUserID(r *http.Request) (int64, error) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		return "", fmt.Errorf("missing Authorization header")
+		return 0, fmt.Errorf("missing Authorization header")
 	}
 	parts := strings.SplitN(authHeader, " ", 2)
 	if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") {
-		return "", fmt.Errorf("invalid Authorization header format")
+		return 0, fmt.Errorf("invalid Authorization header format")
 	}
 	tokenStr := parts[1]
 
@@ -69,21 +69,24 @@ func extractUserID(r *http.Request) (string, error) {
 	parser := jwt.NewParser()
 	token, _, err := parser.ParseUnverified(tokenStr, jwt.MapClaims{})
 	if err != nil {
-		return "", fmt.Errorf("failed to parse JWT: %w", err)
+		return 0, fmt.Errorf("failed to parse JWT: %w", err)
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return "", fmt.Errorf("invalid JWT claims")
+		return 0, fmt.Errorf("invalid JWT claims")
 	}
 
 	// Support both "sub" and "user_id" claim names
+	var userID int64
 	if sub, err := claims.GetSubject(); err == nil && sub != "" {
-		return sub, nil
+		if _, err := fmt.Sscanf(sub, "%d", &userID); err == nil && userID > 0 {
+			return userID, nil
+		}
 	}
-	if uid, ok := claims["user_id"].(string); ok && uid != "" {
-		return uid, nil
+	if uid, ok := claims["user_id"].(float64); ok && uid > 0 {
+		return int64(uid), nil
 	}
 
-	return "", fmt.Errorf("user_id not found in JWT claims")
+	return 0, fmt.Errorf("user_id not found in JWT claims")
 }

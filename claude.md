@@ -3,6 +3,9 @@
 본 서버는 서비스서버의 sse 요청 기능이 늘어남에 따라 별도로 증설하게 된 sse 게이트웨이이다.
 클라이언트와 sse 연결을 수립하고 rabbitmq 의 AMQP를 통해 이벤트를 갱신한다.
 k8s 환경에서 deployment pod로 동작한다.
+
+구체화된 팀 간 계약과 운영 gap은 `sse-design-handoff.md`를 기준으로 확인한다.
+
 RABBITMQ_HOST: "rabbitmq-headless.rabbitmq"
 RABBITMQ_PORT: "5672"
 를 Config map으로 주입받으며 해당 RabbitMQ의 x.sse.fanout을 구독해야한다.
@@ -30,4 +33,3 @@ x.sse.fanout 는 이미 실제 서버에 존재하는 Exchange이다. 절대 본
 exclusive = true
 auto-delete = true
 x-expires: 1800000
-

@@ -10,10 +10,24 @@ import (
 )
 
 // NewConnectHandler returns the HTTP handler for GET /sse/connect.
-// It extracts user_id from the Authorization Bearer JWT token,
-// registers the client with the hub, and streams events until the client disconnects.
+// It extracts user_id from the JWT token, registers the client with the hub,
+// and streams events until the client disconnects.
 func NewConnectHandler(hub *Hub) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		allowOrigin := r.Header.Get("Origin")
+		if allowOrigin == "" {
+			allowOrigin = "*"
+		}
+		w.Header().Set("Access-Control-Allow-Origin", allowOrigin)
+		w.Header().Set("Vary", "Origin")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
 		userID, err := extractUserID(r)
 		if err != nil {
 			http.Error(w, "unauthorized: "+err.Error(), http.StatusUnauthorized)
@@ -52,18 +66,22 @@ func NewConnectHandler(hub *Hub) http.HandlerFunc {
 	}
 }
 
-// extractUserID parses the Authorization: Bearer <JWT> header and returns the subject claim as user_id.
+// extractUserID parses either access_token query param or Authorization: Bearer <JWT>
+// and returns the subject claim as user_id.
 // Signature verification is skipped because this gateway runs inside the cluster (internal network).
 func extractUserID(r *http.Request) (int64, error) {
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		return 0, fmt.Errorf("missing Authorization header")
+	tokenStr := strings.TrimSpace(r.URL.Query().Get("access_token"))
+	if tokenStr == "" {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			return 0, fmt.Errorf("missing access token")
+		}
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") {
+			return 0, fmt.Errorf("invalid Authorization header format")
+		}
+		tokenStr = parts[1]
 	}
-	parts := strings.SplitN(authHeader, " ", 2)
-	if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") {
-		return 0, fmt.Errorf("invalid Authorization header format")
-	}
-	tokenStr := parts[1]
 
 	// Parse without verification (internal cluster; trust the issuer)
 	parser := jwt.NewParser()

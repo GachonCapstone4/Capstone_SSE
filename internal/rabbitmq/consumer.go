@@ -6,8 +6,8 @@ import (
 	"log"
 	"time"
 
-	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/google/uuid"
+	amqp "github.com/rabbitmq/amqp091-go"
 
 	"capstone_sse/internal/config"
 	"capstone_sse/internal/sse"
@@ -94,6 +94,12 @@ func connect(hub *sse.Hub, cfg *config.Config) error {
 		false, // no-wait
 		nil,
 	)
+	for d := range msgs {
+		// [DEBUG] 수신된 JSON 원본을 그대로 출력
+		log.Printf("Raw MQ Message: %s", d.Body)
+
+	}
+
 	if err != nil {
 		return fmt.Errorf("consume: %w", err)
 	}

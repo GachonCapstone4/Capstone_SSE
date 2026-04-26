@@ -37,7 +37,7 @@ func NewConnectHandler(hub *Hub) http.HandlerFunc {
 		hub.Register(userID, ch)
 		defer hub.Unregister(userID, ch)
 
-		log.Printf("SSE client connected: user_id=%s remote=%s", userID, r.RemoteAddr)
+		log.Printf("SSE client connected: user_id=%d remote=%s", userID, r.RemoteAddr)
 
 		for {
 			select {
@@ -45,7 +45,7 @@ func NewConnectHandler(hub *Hub) http.HandlerFunc {
 				fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event.Type, string(event.Data))
 				flusher.Flush()
 			case <-r.Context().Done():
-				log.Printf("SSE client disconnected: user_id=%s", userID)
+				log.Printf("SSE client disconnected: user_id=%d reason=%v", userID, r.Context().Err())
 				return
 			}
 		}

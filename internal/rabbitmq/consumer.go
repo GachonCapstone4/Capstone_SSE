@@ -16,10 +16,13 @@ import (
 const exchangeName = "x.sse.fanout"
 
 // incomingMessage is the envelope published by service servers to the exchange.
+// Some messages carry a nested "data" object; others are flat with "message"/"raw_output" at the top level.
 type incomingMessage struct {
-	UserID  int64           `json:"user_id"`
-	SSEType string          `json:"sse_type"`
-	Data    json.RawMessage `json:"data"`
+	UserID    int64           `json:"user_id"`
+	SSEType   string          `json:"sse_type"`
+	Data      json.RawMessage `json:"data"`
+	Message   string          `json:"message"`    // flat fallback
+	RawOutput string          `json:"raw_output"` // flat fallback
 }
 
 // StartConsumer connects to RabbitMQ, declares the temporary queue,
@@ -133,7 +136,7 @@ func dispatch(hub *sse.Hub, body []byte) {
 		return
 	}
 
-	text := extractText(incoming.Data)
+	text := extractText(incoming)
 	out := outgoingPayload{
 		UserID:  incoming.UserID,
 		SSEType: incoming.SSEType,
@@ -148,27 +151,33 @@ func dispatch(hub *sse.Hub, body []byte) {
 	})
 }
 
-// extractText pulls message and raw_output from the incoming data object and
-// returns them joined as plain text. Falls back to the raw JSON string if
-// neither field is present.
-func extractText(raw json.RawMessage) string {
-	if len(raw) == 0 || string(raw) == "null" {
-		return ""
+// extractText pulls message and raw_output as plain text.
+// Priority: nested "data" object → flat top-level fields.
+func extractText(msg incomingMessage) string {
+	// 1. nested data 객체에서 추출 시도
+	if len(msg.Data) > 0 && string(msg.Data) != "null" {
+		var m map[string]string
+		if err := json.Unmarshal(msg.Data, &m); err == nil {
+			message, rawOut := m["message"], m["raw_output"]
+			switch {
+			case message != "" && rawOut != "":
+				return message + "\n" + rawOut
+			case message != "":
+				return message
+			case rawOut != "":
+				return rawOut
+			}
+		}
 	}
-	var m map[string]string
-	if err := json.Unmarshal(raw, &m); err != nil {
-		return string(raw)
-	}
-	msg := m["message"]
-	out := m["raw_output"]
+	// 2. flat 최상위 필드 fallback
 	switch {
-	case msg != "" && out != "":
-		return msg + "\n" + out
-	case msg != "":
-		return msg
-	case out != "":
-		return out
+	case msg.Message != "" && msg.RawOutput != "":
+		return msg.Message + "\n" + msg.RawOutput
+	case msg.Message != "":
+		return msg.Message
+	case msg.RawOutput != "":
+		return msg.RawOutput
 	default:
-		return string(raw)
+		return ""
 	}
 }

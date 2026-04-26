@@ -94,12 +94,6 @@ func connect(hub *sse.Hub, cfg *config.Config) error {
 		false, // no-wait
 		nil,
 	)
-	for d := range msgs {
-		// [DEBUG] 수신된 JSON 원본을 그대로 출력
-		log.Printf("Raw MQ Message: %s", d.Body)
-
-	}
-
 	if err != nil {
 		return fmt.Errorf("consume: %w", err)
 	}
@@ -113,6 +107,7 @@ func connect(hub *sse.Hub, cfg *config.Config) error {
 			if !ok {
 				return fmt.Errorf("message channel closed")
 			}
+			log.Printf("Raw MQ Message: %s", msg.Body)
 			dispatch(hub, msg.Body)
 		case err := <-connClose:
 			return fmt.Errorf("connection closed: %v", err)

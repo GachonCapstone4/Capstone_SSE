@@ -115,6 +115,13 @@ func connect(hub *sse.Hub, cfg *config.Config) error {
 	}
 }
 
+// outgoingPayload is the fixed envelope sent to SSE clients.
+type outgoingPayload struct {
+	UserID  int64  `json:"user_id"`
+	SSEType string `json:"sse_type"`
+	Data    string `json:"data"`
+}
+
 func dispatch(hub *sse.Hub, body []byte) {
 	var incoming incomingMessage
 	if err := json.Unmarshal(body, &incoming); err != nil {
@@ -126,33 +133,42 @@ func dispatch(hub *sse.Hub, body []byte) {
 		return
 	}
 
-	data := enrichPayload(incoming)
-	log.Printf("Broadcast → user_id=%d sse_type=%s data=%s", incoming.UserID, incoming.SSEType, string(data))
+	text := extractText(incoming.Data)
+	out := outgoingPayload{
+		UserID:  incoming.UserID,
+		SSEType: incoming.SSEType,
+		Data:    text,
+	}
+	raw, _ := json.Marshal(out)
+	log.Printf("Broadcast → user_id=%d sse_type=%s data=%q", incoming.UserID, incoming.SSEType, text)
 
 	hub.Broadcast(incoming.UserID, sse.Event{
 		Type: incoming.SSEType,
-		Data: data,
+		Data: raw,
 	})
 }
 
-// enrichPayload merges user_id and sse_type into the data object.
-// Handles both nested {"data": {...}} and flat message structures.
-func enrichPayload(msg incomingMessage) json.RawMessage {
-	var m map[string]interface{}
-
-	if len(msg.Data) > 0 && string(msg.Data) != "null" {
-		if err := json.Unmarshal(msg.Data, &m); err != nil {
-			m = make(map[string]interface{})
-		}
-	} else {
-		// data 필드가 없으면 전체 body를 flat하게 파싱
-		m = make(map[string]interface{})
+// extractText pulls message and raw_output from the incoming data object and
+// returns them joined as plain text. Falls back to the raw JSON string if
+// neither field is present.
+func extractText(raw json.RawMessage) string {
+	if len(raw) == 0 || string(raw) == "null" {
+		return ""
 	}
-
-	// 프론트가 접근하는 user_id, sse_type을 payload 안에 보장
-	m["user_id"] = msg.UserID
-	m["sse_type"] = msg.SSEType
-
-	result, _ := json.Marshal(m)
-	return result
+	var m map[string]string
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return string(raw)
+	}
+	msg := m["message"]
+	out := m["raw_output"]
+	switch {
+	case msg != "" && out != "":
+		return msg + "\n" + out
+	case msg != "":
+		return msg
+	case out != "":
+		return out
+	default:
+		return string(raw)
+	}
 }

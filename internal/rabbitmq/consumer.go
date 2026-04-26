@@ -125,8 +125,34 @@ func dispatch(hub *sse.Hub, body []byte) {
 		log.Printf("Dropping message: missing user_id or sse_type — body: %s", string(body))
 		return
 	}
+
+	data := enrichPayload(incoming)
+	log.Printf("Broadcast → user_id=%d sse_type=%s data=%s", incoming.UserID, incoming.SSEType, string(data))
+
 	hub.Broadcast(incoming.UserID, sse.Event{
 		Type: incoming.SSEType,
-		Data: incoming.Data,
+		Data: data,
 	})
+}
+
+// enrichPayload merges user_id and sse_type into the data object.
+// Handles both nested {"data": {...}} and flat message structures.
+func enrichPayload(msg incomingMessage) json.RawMessage {
+	var m map[string]interface{}
+
+	if len(msg.Data) > 0 && string(msg.Data) != "null" {
+		if err := json.Unmarshal(msg.Data, &m); err != nil {
+			m = make(map[string]interface{})
+		}
+	} else {
+		// data 필드가 없으면 전체 body를 flat하게 파싱
+		m = make(map[string]interface{})
+	}
+
+	// 프론트가 접근하는 user_id, sse_type을 payload 안에 보장
+	m["user_id"] = msg.UserID
+	m["sse_type"] = msg.SSEType
+
+	result, _ := json.Marshal(m)
+	return result
 }

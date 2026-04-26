@@ -55,15 +55,25 @@ func NewConnectHandler(hub *Hub) http.HandlerFunc {
 // extractUserID parses the Authorization: Bearer <JWT> header and returns the subject claim as user_id.
 // Signature verification is skipped because this gateway runs inside the cluster (internal network).
 func extractUserID(r *http.Request) (int64, error) {
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		return 0, fmt.Errorf("missing Authorization header")
+	var tokenStr string
+
+	// 1순위: Authorization: Bearer <JWT> 헤더
+	if authHeader := r.Header.Get("Authorization"); authHeader != "" {
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") {
+			return 0, fmt.Errorf("invalid Authorization header format")
+		}
+		tokenStr = parts[1]
 	}
-	parts := strings.SplitN(authHeader, " ", 2)
-	if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") {
-		return 0, fmt.Errorf("invalid Authorization header format")
+
+	// 2순위: ?access_token=<JWT> 쿼리 파라미터 (브라우저 기본 EventSource 대응)
+	if tokenStr == "" {
+		tokenStr = r.URL.Query().Get("access_token")
 	}
-	tokenStr := parts[1]
+
+	if tokenStr == "" {
+		return 0, fmt.Errorf("missing Authorization header or access_token query param")
+	}
 
 	// Parse without verification (internal cluster; trust the issuer)
 	parser := jwt.NewParser()

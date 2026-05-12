@@ -151,11 +151,16 @@ func dispatch(hub *sse.Hub, body []byte) {
 	})
 }
 
-// extractText pulls message and raw_output as plain text.
-// Priority: nested "data" object → flat top-level fields.
+// extractText pulls the data payload as plain text.
+// Priority: data string → data object (message/raw_output) → flat top-level fields.
 func extractText(msg incomingMessage) string {
-	// 1. nested data 객체에서 추출 시도
 	if len(msg.Data) > 0 && string(msg.Data) != "null" {
+		// 1. data 가 plain string인 경우 ("\"[INFO] ...\"")
+		var s string
+		if err := json.Unmarshal(msg.Data, &s); err == nil {
+			return s
+		}
+		// 2. data 가 객체인 경우 ({"message": ..., "raw_output": ...})
 		var m map[string]string
 		if err := json.Unmarshal(msg.Data, &m); err == nil {
 			message, rawOut := m["message"], m["raw_output"]

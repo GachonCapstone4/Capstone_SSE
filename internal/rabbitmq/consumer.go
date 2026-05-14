@@ -136,14 +136,24 @@ func dispatch(hub *sse.Hub, body []byte) {
 		return
 	}
 
-	text := extractText(incoming)
+	var outData json.RawMessage
+	if len(incoming.Data) > 0 && string(incoming.Data) != "null" {
+		// data 필드가 있으면 (string, array, object 모두) 그대로 전달
+		outData = incoming.Data
+	} else {
+		// data 없으면 flat message/raw_output을 JSON string으로 직렬화
+		text := extractText(incoming)
+		quoted, _ := json.Marshal(text)
+		outData = json.RawMessage(quoted)
+	}
+
 	out := outgoingPayload{
 		UserID:  incoming.UserID,
 		SSEType: incoming.SSEType,
-		Data:    json.RawMessage(text),
+		Data:    outData,
 	}
 	raw, _ := json.Marshal(out)
-	log.Printf("Broadcast → user_id=%d sse_type=%s data=%q", incoming.UserID, incoming.SSEType, text)
+	log.Printf("Broadcast → user_id=%d sse_type=%s data=%s", incoming.UserID, incoming.SSEType, string(outData))
 
 	hub.Broadcast(incoming.UserID, sse.Event{
 		Type: incoming.SSEType,

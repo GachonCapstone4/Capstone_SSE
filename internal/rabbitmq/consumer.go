@@ -120,9 +120,9 @@ func connect(hub *sse.Hub, cfg *config.Config) error {
 
 // outgoingPayload is the fixed envelope sent to SSE clients.
 type outgoingPayload struct {
-	UserID  int64  `json:"user_id"`
-	SSEType string `json:"sse_type"`
-	Data    string `json:"data"`
+	UserID  int64           `json:"user_id"`
+	SSEType string          `json:"sse_type"`
+	Data    json.RawMessage `json:"data"`
 }
 
 func dispatch(hub *sse.Hub, body []byte) {

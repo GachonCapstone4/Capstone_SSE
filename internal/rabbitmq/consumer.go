@@ -140,7 +140,7 @@ func dispatch(hub *sse.Hub, body []byte) {
 	out := outgoingPayload{
 		UserID:  incoming.UserID,
 		SSEType: incoming.SSEType,
-		Data:    text,
+		Data:    json.RawMessage(text),
 	}
 	raw, _ := json.Marshal(out)
 	log.Printf("Broadcast → user_id=%d sse_type=%s data=%q", incoming.UserID, incoming.SSEType, text)
